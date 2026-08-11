@@ -1,7 +1,6 @@
 import streamlit as st
 import google.generativeai as genai
 from PIL import Image
-import json
 import re
 
 # ---------------------------------------------------------
@@ -62,53 +61,16 @@ css_style = """
         box-shadow: 0 0 30px rgba(16, 185, 129, 0.7);
     }
 
-    /* 둥그런 Glassmorphism 타점 카드 */
+    /* 둥그런 Glassmorphism 분석 결과 카드 */
     .trade-card {
         background: rgba(28, 37, 65, 0.75);
         backdrop-filter: blur(12px);
         border: 1px solid rgba(255, 255, 255, 0.12);
         border-radius: 18px;
-        padding: 20px;
+        padding: 24px;
         margin-bottom: 16px;
         box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
-    }
-
-    /* 수치 박스 (진입가/손절가/목표가) */
-    .metric-box-entry {
-        background: rgba(16, 185, 129, 0.12);
-        border: 1.5px solid #10b981;
-        border-radius: 14px;
-        padding: 16px;
-        text-align: center;
-        box-shadow: 0 0 15px rgba(16, 185, 129, 0.2);
-    }
-    .metric-box-sl {
-        background: rgba(239, 68, 68, 0.12);
-        border: 1.5px solid #ef4444;
-        border-radius: 14px;
-        padding: 16px;
-        text-align: center;
-        box-shadow: 0 0 15px rgba(239, 68, 68, 0.2);
-    }
-    .metric-box-tp {
-        background: rgba(59, 130, 246, 0.12);
-        border: 1.5px solid #3b82f6;
-        border-radius: 14px;
-        padding: 16px;
-        text-align: center;
-        box-shadow: 0 0 15px rgba(59, 130, 246, 0.2);
-    }
-
-    .metric-label {
-        font-size: 13px;
-        font-weight: 600;
-        color: #94a3b8;
-        margin-bottom: 4px;
-    }
-    .metric-val {
-        font-size: 22px;
-        font-weight: 800;
-        letter-spacing: -0.5px;
+        line-height: 1.7;
     }
 </style>
 """
@@ -136,36 +98,68 @@ if not st.session_state.authenticated:
     st.stop()
 
 # ---------------------------------------------------------
-# 3. 100% ICT (Smart Money Concepts) 미국 급등주 전용 프롬프트
+# 3. KST 킬존 & 다중시간대 기반 ICT/SMC 고도화 시스템 프롬프트
 # ---------------------------------------------------------
 SYSTEM_PROMPT = r"""
-당신은 ICT(Inner Circle Trader) / SMC(Smart Money Concepts) 전문 트레이더 AI입니다.
-업로드된 미국 급등주 차트 이미지(1개~4개 자유 업로드)를 시각적으로 정밀 분석하여 오직 'Long(매수)' 진입 타점만을 산출하세요.
+[Role & Identity]
+당신은 ICT(Inner Circle Trader) 및 SMC(Smart Money Concepts) 이론에 입각한 '미국 급등주/단타 롱(Long/매수) 전용 멀티 타임프레임 스캘핑 엔진'입니다.
+사용자는 한국(KST)에 거주하며 오직 롱(상승) 포지션만 매매합니다. 숏(Short) 분석은 배제하고, 상위 시간대의 방향성(Daily Bias)과 하위 시간대의 개미 털기(SSL Sweep)를 연계한 승률 높은 롱 타점만 포착하세요.
 
-[ICT 필수 분석 체크리스트]
-1. NY Morning Kill Zone (9:30 AM EST 개장 유동성) 및 BSL/SSL Sweep (스윕/개미털기) 여부
-2. MSS (Market Structure Shift) / CHoCH (구조 전환) 발생 및 Displacement (기관 장대양봉) 확인
-3. FVG (Fair Value Gap / 비효율 갭) 및 Bullish Order Block (불리쉬 오더블록) 진입 타점 설정
-4. Target Liquidity (상단 BSL / 전고점 / 유동성 풀) 목표가 설정
+[Timezone & Kill Zone Rules (KST Base)]
+사용자가 입력한 한국 시간(KST) 또는 이미지 정보를 바탕으로 킬존 여부를 자동 판별하세요:
+1. 서머타임 기간 (3월 중순 ~ 11월 초):
+   - 🔥 NY Open Kill Zone: 22:30 ~ 24:00 (KST) -> 메인 진입 타겟 시간대
+   - 🌙 NY PM Kill Zone: 02:30 ~ 04:00 (KST)
+2. 서머타임 해제 기간 (11월 초 ~ 3월 중순):
+   - 🔥 NY Open Kill Zone: 23:30 ~ 01:00 (KST) -> 메인 진입 타겟 시간대
+   - 🌙 NY PM Kill Zone: 03:30 ~ 05:00 (KST)
 
-응답은 장문의 부연 설명 없이, 오직 아래 JSON 형식으로만 정밀하게 출력하세요:
+[Multi-Timeframe Analysis Principle]
+반드시 아래 3단계 다중 시간대 흐름을 교차 검증하여 타점을 산출해야 합니다:
+- HTF (1시간봉/4시간봉): 전체적인 매수 관점(Bias) 및 상위 반등 FVG / 목표 BSL 확인
+- MTF (15분봉/5분봉): 개미 털기 저점 스윕(SSL Sweep) 및 5분봉 FVG 형성 확인
+- LTF (1분봉/3분봉): 5분봉 FVG 내에서 1분봉 MSS 발생 후 정밀 스나이퍼 진입 (Confluence)
 
-{
-  "ticker_info": "$SOUN (1시간/15분/5분 ICT 중첩)",
-  "killzone_status": "NY Morning Killzone (적합)",
-  "ict_setup": "SSL 스윕 후 FVG + Order Block 재테스트 매수",
-  "entry": "$5.45",
-  "stop_loss": "$5.20",
-  "tp1": "$5.85",
-  "tp2": "$6.30",
-  "risk_reward": "1 : 2.6",
-  "ict_reasons": [
-    "SSL(장초반 손절 물량) 청산 스윕 완료",
-    "강력한 Displacement(기관 장대양봉) 및 MSS(구조 전환) 확인",
-    "5분봉 FVG(비효율 갭) 및 Bullish Order Block 지지 테스트"
-  ],
-  "invalidation": "FVG 하단 및 오더블록 훼손 시($5.20 하향 종가 이탈) 즉시 손절"
-}
+[Operational Workflow - 2 Step System]
+
+■ STEP 1: 역질문 정보 수집 모드 (데이터 및 차트 정보 부족 시)
+사용자가 종목이나 차트 상황을 언급할 때 데이터가 부족하면 함부로 분석하지 말고 즉시 아래 질문을 던지세요:
+1. 티커 및 현재 한국 시간 (예: TSLA, 밤 10시 40분)
+2. 1시간봉/15분봉 맥락: 상위 시간대 매수 지지선 도달 여부 및 5분/15분봉 저점(SSL) 스윕 가격
+3. 1분봉/5분봉 타점: 스윕 후 발생한 MSS(상승 구조 전환) 고점 및 5분/1분봉 매수 갭(Bullish FVG) 범위
+
+■ STEP 2: 매매 계획 산출 모드 (데이터 수집 및 차트 확인 완료 시)
+정보가 충분히 주어지면 즉시 ICT 롱 모델에 따라 분석을 수행하고 반드시 아래 양식으로만 답변하세요:
+
+---------------------------------------------------
+[ICT Multi-Timeframe Long Trade Plan]
+
+1. 🧭 시장 맥락 및 킬존 (KST 기준)
+   - 현재 한국 시간: [입력 또는 판별된 KST 시간]
+   - 킬존 충족 여부: [NY Open 킬존 / PM 킬존 / 킬존 외 시간대 (경고)]
+   - 상위 시간대(HTF) 맥락: [1시간봉/15분봉 지지선 및 매수 Bias 여부]
+
+2. 🔍 다중 시간대 ICT 구조 분석 (Multi-Timeframe Structure)
+   - SSL 스윕 (5분/15분): [개미 털기 저점 가격 및 꼬리 형성 여부]
+   - MSS 상승 구조 전환 (1분/5분): [돌파된 직전 스윙 고점 가격]
+   - 매수 구간 (Confluence FVG): [5분봉 FVG와 1분봉 FVG가 겹치는 가격 범위]
+
+3. 🎯 실전 롱 매매 타점 (Long Setup Execution)
+   - 🟢 진입 타점 (Entry): [5분/1분 FVG 중단 또는 OTE 0.618~0.786 디스카운트 가격]
+   - 🔴 손절가 (Stop Loss): [SSL 스윕 꼬리 저점 바로 밑 - 여유분 반영]
+   - 🔵 1차 익절가 (TP1): [1분/5분봉 직전 고점 유동성 BSL]
+   - 🟣 2차 익절가 (TP2): [1시간봉 상위 유동성 BSL 또는 손익비 1:3 지점]
+   - 📐 손익비 (Risk to Reward): [예: 1 : 2.8]
+
+4. 🚨 진입 취소 및 무효화 조건 (Invalidation)
+   - [예: FVG 하단 종가 이탈 시, 킬존 시간 경과 시, 1분봉 거래량 급감 시 진입 취소]
+---------------------------------------------------
+
+[Strict Trading Rules]
+- 숏(Short) 포지션 절대 분석 금지.
+- SSL(저점 털기) 없는 상태에서의 무지성 급등은 "진입 불가(No Trade)"로 처리.
+- 손익비가 최소 1:2 미만인 경우 진입 자제 권고.
+- 1분봉 단독 분석 요청 시에도 5분봉/1시간봉 맥락 확인을 반드시 요구할 것.
 """
 
 # ---------------------------------------------------------
@@ -221,13 +215,13 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("## 💬 ICT CONSULTING")
 
 # ---------------------------------------------------------
-# 6. 메인 UI - 드래그 & 드롭 한 번으로 해결되는 업로더
+# 6. 메인 UI - 업로더 및 정보 입력창
 # ---------------------------------------------------------
 st.markdown("<h1 class='shimmer-header'>⚡ ICT US EQUITY DAY TRADING TERMINAL</h1>", unsafe_allow_html=True)
-st.caption("미국 급등주 차트(1시간, 15분, 5분, 1분봉 등)를 1개~4개 자유롭게 드래그해서 넣으세요. ICT 스마트머니 프레임워크 기반 최적 타점을 산출합니다.")
+st.caption("미국 급등주 차트(1시간, 15분, 5분, 1분봉)를 업로드하거나 현재 상황을 입력하세요. KST 킬존 및 SSL 스윕 기반의 정밀 롱 타점을 산출합니다.")
 
 uploaded_files = st.file_uploader(
-    "📸 미국주식 차트 이미지 drag & drop (1개~4개 한번에 업로드 가능)", 
+    "📸 미국주식 차트 이미지 drag & drop (1개~4개 자유 업로드)", 
     type=["png", "jpg", "jpeg"], 
     accept_multiple_files=True
 )
@@ -243,86 +237,31 @@ if uploaded_files:
 
 st.markdown("<br>", unsafe_allow_html=True)
 
+user_context = st.text_input(
+    "💡 실시간 정보 입력 (선택사항 - 예: TSLA, 현재 한국시간 밤 10시 40분):", 
+    placeholder="예: TSLA, 한국시간 밤 10시 45분, 5분봉 SSL 스윕 후 반등 중"
+)
+
 # ---------------------------------------------------------
-# 7. 분석 실행 및 시각 카드 UI 출력
+# 7. 분석 실행 및 리포트 출력
 # ---------------------------------------------------------
 if st.button("🚀 ICT 롱 타점 분석 실행", type="primary"):
     if not api_key:
         st.error("사이드바에 API Key를 입력하거나 Secrets에 등록해주세요!")
-    elif not images:
-        st.warning("분석할 미국주식 차트 이미지를 업로드해주세요!")
     else:
-        with st.spinner("⚡ ICT 스마트머니(Sweep, FVG, OrderBlock) 분석 중..."):
+        with st.spinner("⚡ ICT 스마트머니(KST 킬존, SSL 스윕, FVG) 정밀 분석 중..."):
             try:
-                raw_text, used_model = call_gemini_ai(api_key, [SYSTEM_PROMPT] + images)
-                
-                json_match = re.search(r'\{.*\}', raw_text, re.DOTALL)
-                if json_match:
-                    data = json.loads(json_match.group(0))
-                else:
-                    data = None
+                prompt_content = [SYSTEM_PROMPT]
+                if user_context:
+                    prompt_content.append(f"사용자 입력 정보: {user_context}")
+                prompt_content.extend(images)
+
+                raw_text, used_model = call_gemini_ai(api_key, prompt_content)
 
                 st.success(f"분석 완료! (엔진: {used_model})")
 
-                if data:
-                    ticker_info = data.get('ticker_info', 'US Stock')
-                    ict_setup = data.get('ict_setup', 'BUY')
-                    killzone_status = data.get('killzone_status', '')
-
-                    header_html = (
-                        '<div class="trade-card">'
-                        '<div style="display: flex; justify-content: space-between; align-items: center;">'
-                        '<div>'
-                        '<span style="font-size: 13px; color: #94a3b8;">종목 및 타임프레임</span>'
-                        f'<h3 style="margin:0; color: #38bdf8 !important;">{ticker_info}</h3>'
-                        '</div>'
-                        '<div style="text-align: right;">'
-                        '<span style="background: rgba(16,185,129,0.2); color: #10b981; padding: 6px 14px; border-radius: 20px; font-weight: 700;">'
-                        f'{ict_setup}'
-                        '</span>'
-                        f'<div style="font-size: 13px; color: #cbd5e1; margin-top: 6px;">{killzone_status}</div>'
-                        '</div>'
-                        '</div>'
-                        '</div>'
-                    )
-                    st.markdown(header_html, unsafe_allow_html=True)
-
-                    c1, c2, c3, c4 = st.columns(4)
-                    entry_val = data.get('entry', '-')
-                    sl_val = data.get('stop_loss', '-')
-                    tp1_val = data.get('tp1', '-')
-                    tp2_val = data.get('tp2', '-')
-                    rr_val = data.get('risk_reward', '-')
-
-                    st_c1 = f'<div class="metric-box-entry"><div class="metric-label">🟢 매수 진입가 (Entry)</div><div class="metric-val" style="color: #10b981;">{entry_val}</div></div>'
-                    st_c2 = f'<div class="metric-box-sl"><div class="metric-label">🔴 손절가 (Stop Loss)</div><div class="metric-val" style="color: #ef4444;">{sl_val}</div></div>'
-                    st_c3 = f'<div class="metric-box-tp"><div class="metric-label">🔵 1차 목표가 (TP1)</div><div class="metric-val" style="color: #3b82f6;">{tp1_val}</div></div>'
-                    st_c4 = f'<div class="metric-box-tp"><div class="metric-label">🟣 2차 목표가 / 손익비</div><div class="metric-val" style="color: #a855f7;">{tp2_val} <span style="font-size:14px; color:#cbd5e1;">({rr_val})</span></div></div>'
-
-                    with c1:
-                        st.markdown(st_c1, unsafe_allow_html=True)
-                    with c2:
-                        st.markdown(st_c2, unsafe_allow_html=True)
-                    with c3:
-                        st.markdown(st_c3, unsafe_allow_html=True)
-                    with c4:
-                        st.markdown(st_c4, unsafe_allow_html=True)
-
-                    st.markdown("<br>", unsafe_allow_html=True)
-
-                    col_a, col_b = st.columns(2)
-                    with col_a:
-                        st.markdown("<div class='trade-card'><h4 style='color:#10b981 !important; margin-top:0;'>🧠 ICT 핵심 근거 (SMC Confluence)</h4>", unsafe_allow_html=True)
-                        for r in data.get('ict_reasons', []):
-                            st.markdown(f"• {r}")
-                        st.markdown("</div>", unsafe_allow_html=True)
-
-                    with col_b:
-                        invalidation_text = data.get('invalidation', '지정 손절가 이탈 시 즉시 손절')
-                        st.markdown(f"<div class='trade-card'><h4 style='color:#ef4444 !important; margin-top:0;'>🚨 손절 / 무효화 기준 (Invalidation)</h4><p>{invalidation_text}</p></div>", unsafe_allow_html=True)
-
-                else:
-                    st.markdown(raw_text)
+                # Glassmorphic 스타일 카드 형태로 깔끔하게 출력
+                st.markdown(f"<div class='trade-card'>{raw_text}</div>", unsafe_allow_html=True)
 
             except Exception as e:
                 st.error(f"분석 오류: {e}")
