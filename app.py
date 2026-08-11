@@ -138,7 +138,7 @@ if not st.session_state.authenticated:
 # ---------------------------------------------------------
 # 3. 100% ICT (Smart Money Concepts) 미국 급등주 전용 프롬프트
 # ---------------------------------------------------------
-SYSTEM_PROMPT = """
+SYSTEM_PROMPT = r"""
 당신은 ICT(Inner Circle Trader) / SMC(Smart Money Concepts) 전문 트레이더 AI입니다.
 업로드된 미국 급등주 차트 이미지(1개~4개 자유 업로드)를 시각적으로 정밀 분석하여 오직 'Long(매수)' 진입 타점만을 산출하세요.
 
@@ -148,9 +148,8 @@ SYSTEM_PROMPT = """
 3. FVG (Fair Value Gap / 비효율 갭) 및 Bullish Order Block (불리쉬 오더블록) 진입 타점 설정
 4. Target Liquidity (상단 BSL / 전고점 / 유동성 풀) 목표가 설정
 
-응답은 장문의 부연 설명 없이, 아래 JSON 포맷으로만 정밀하게 출력하세요:
+응답은 장문의 부연 설명 없이, 오직 아래 JSON 형식으로만 정밀하게 출력하세요:
 
-```json
 {
   "ticker_info": "$SOUN (1시간/15분/5분 ICT 중첩)",
   "killzone_status": "NY Morning Killzone (적합)",
@@ -167,193 +166,187 @@ SYSTEM_PROMPT = """
   ],
   "invalidation": "FVG 하단 및 오더블록 훼손 시($5.20 하향 종가 이탈) 즉시 손절"
 }
+"""
+
+# ---------------------------------------------------------
+# 4. 0% 에러 자동 모델 복구 엔진
+# ---------------------------------------------------------
 def call_gemini_ai(api_key, contents):
-genai.configure(api_key=api_key)
-
-priority_models = [
-    'gemini-2.5-flash',
-    'gemini-2.0-flash',
-    'gemini-1.5-flash',
-    'gemini-1.5-pro'
-]
-
-for m_name in priority_models:
-    try:
-        model = genai.GenerativeModel(m_name)
-        res = model.generate_content(contents)
-        return res.text, m_name
-    except Exception:
-        continue
-
-try:
-    available_models = [
-        m.name for m in genai.list_models() 
-        if 'generateContent' in m.supported_generation_methods
+    genai.configure(api_key=api_key)
+    
+    priority_models = [
+        'gemini-2.5-flash',
+        'gemini-2.0-flash',
+        'gemini-1.5-flash',
+        'gemini-1.5-pro'
     ]
-    for m_name in available_models:
+    
+    for m_name in priority_models:
         try:
             model = genai.GenerativeModel(m_name)
             res = model.generate_content(contents)
             return res.text, m_name
         except Exception:
             continue
-except Exception as e:
-    raise Exception(f"사용 가능한 AI 모델 탐색 실패: {e}")
 
-raise Exception("모든 AI 모델 호출 실패. API 키 권한을 확인하세요.")
-def call_gemini_ai(api_key, contents):
-genai.configure(api_key=api_key)
-
-priority_models = [
-    'gemini-2.5-flash',
-    'gemini-2.0-flash',
-    'gemini-1.5-flash',
-    'gemini-1.5-pro'
-]
-
-for m_name in priority_models:
     try:
-        model = genai.GenerativeModel(m_name)
-        res = model.generate_content(contents)
-        return res.text, m_name
-    except Exception:
-        continue
+        available_models = [
+            m.name for m in genai.list_models() 
+            if 'generateContent' in m.supported_generation_methods
+        ]
+        for m_name in available_models:
+            try:
+                model = genai.GenerativeModel(m_name)
+                res = model.generate_content(contents)
+                return res.text, m_name
+            except Exception:
+                continue
+    except Exception as e:
+        raise Exception(f"사용 가능한 AI 모델 탐색 실패: {e}")
 
-try:
-    available_models = [
-        m.name for m in genai.list_models() 
-        if 'generateContent' in m.supported_generation_methods
-    ]
-    for m_name in available_models:
-        try:
-            model = genai.GenerativeModel(m_name)
-            res = model.generate_content(contents)
-            return res.text, m_name
-        except Exception:
-            continue
-except Exception as e:
-    raise Exception(f"사용 가능한 AI 모델 탐색 실패: {e}")
+    raise Exception("모든 AI 모델 호출 실패. API 키 권한을 확인하세요.")
 
-raise Exception("모든 AI 모델 호출 실패. API 키 권한을 확인하세요.")
-st.markdown("⚡ ICT US EQUITY DAY TRADING TERMINAL", unsafe_allow_html=True)
+# ---------------------------------------------------------
+# 5. 사이드바 설정
+# ---------------------------------------------------------
+st.sidebar.markdown("## ⚙️ SETTINGS")
+
+if "GEMINI_API_KEY" in st.secrets:
+    api_key = st.secrets["GEMINI_API_KEY"]
+    st.sidebar.success("🔑 API Key 자동 연결됨")
+else:
+    api_key = st.sidebar.text_input("Gemini API Key:", type="password")
+
+st.sidebar.markdown("---")
+st.sidebar.markdown("## 💬 ICT CONSULTING")
+
+# ---------------------------------------------------------
+# 6. 메인 UI - 드래그 & 드롭 한 번으로 해결되는 업로더
+# ---------------------------------------------------------
+st.markdown("<h1 class='shimmer-header'>⚡ ICT US EQUITY DAY TRADING TERMINAL</h1>", unsafe_allow_html=True)
 st.caption("미국 급등주 차트(1시간, 15분, 5분, 1분봉 등)를 1개~4개 자유롭게 드래그해서 넣으세요. ICT 스마트머니 프레임워크 기반 최적 타점을 산출합니다.")
 
 uploaded_files = st.file_uploader(
-"📸 미국주식 차트 이미지 drag & drop (1개~4개 한번에 업로드 가능)",
-type=["png", "jpg", "jpeg"],
-accept_multiple_files=True
+    "📸 미국주식 차트 이미지 drag & drop (1개~4개 한번에 업로드 가능)", 
+    type=["png", "jpg", "jpeg"], 
+    accept_multiple_files=True
 )
 
 images = []
 if uploaded_files:
-cols = st.columns(min(len(uploaded_files), 4))
-for idx, file in enumerate(uploaded_files):
-img = Image.open(file)
-images.append(img)
-with cols[idx % 4]:
-st.image(img, caption=f"차트 #{idx+1}", use_container_width=True)
+    cols = st.columns(min(len(uploaded_files), 4))
+    for idx, file in enumerate(uploaded_files):
+        img = Image.open(file)
+        images.append(img)
+        with cols[idx % 4]:
+            st.image(img, caption=f"차트 #{idx+1}", use_container_width=True)
 
-st.markdown("
+st.markdown("<br>", unsafe_allow_html=True)
 
-
-", unsafe_allow_html=True)
+# ---------------------------------------------------------
+# 7. 분석 실행 및 시각 카드 UI 출력
+# ---------------------------------------------------------
 if st.button("🚀 ICT 롱 타점 분석 실행", type="primary"):
-if not api_key:
-st.error("사이드바에 API Key를 입력하거나 Secrets에 등록해주세요!")
-elif not images:
-st.warning("분석할 미국주식 차트 이미지를 업로드해주세요!")
-else:
-with st.spinner("⚡ ICT 스마트머니(Sweep, FVG, OrderBlock) 분석 중..."):
-try:
-raw_text, used_model = call_gemini_ai(api_key, [SYSTEM_PROMPT] + images)
+    if not api_key:
+        st.error("사이드바에 API Key를 입력하거나 Secrets에 등록해주세요!")
+    elif not images:
+        st.warning("분석할 미국주식 차트 이미지를 업로드해주세요!")
+    else:
+        with st.spinner("⚡ ICT 스마트머니(Sweep, FVG, OrderBlock) 분석 중..."):
+            try:
+                raw_text, used_model = call_gemini_ai(api_key, [SYSTEM_PROMPT] + images)
+                
+                json_match = re.search(r'\{.*\}', raw_text, re.DOTALL)
+                if json_match:
+                    data = json.loads(json_match.group(0))
+                else:
+                    data = None
 
-            json_match = re.search(r'\{.*\}', raw_text, re.DOTALL)
-            if json_match:
-                data = json.loads(json_match.group(0))
-            else:
-                data = None
+                st.success(f"분석 완료! (엔진: {used_model})")
 
-            st.success(f"분석 완료! (엔진: {used_model})")
+                if data:
+                    ticker_info = data.get('ticker_info', 'US Stock')
+                    ict_setup = data.get('ict_setup', 'BUY')
+                    killzone_status = data.get('killzone_status', '')
 
-            if data:
-                ticker_info = data.get('ticker_info', 'US Stock')
-                ict_setup = data.get('ict_setup', 'BUY')
-                killzone_status = data.get('killzone_status', '')
+                    header_html = (
+                        '<div class="trade-card">'
+                        '<div style="display: flex; justify-content: space-between; align-items: center;">'
+                        '<div>'
+                        '<span style="font-size: 13px; color: #94a3b8;">종목 및 타임프레임</span>'
+                        f'<h3 style="margin:0; color: #38bdf8 !important;">{ticker_info}</h3>'
+                        '</div>'
+                        '<div style="text-align: right;">'
+                        '<span style="background: rgba(16,185,129,0.2); color: #10b981; padding: 6px 14px; border-radius: 20px; font-weight: 700;">'
+                        f'{ict_setup}'
+                        '</span>'
+                        f'<div style="font-size: 13px; color: #cbd5e1; margin-top: 6px;">{killzone_status}</div>'
+                        '</div>'
+                        '</div>'
+                        '</div>'
+                    )
+                    st.markdown(header_html, unsafe_allow_html=True)
 
-                header_html = (
-                    '<div class="trade-card">'
-                    '<div style="display: flex; justify-content: space-between; align-items: center;">'
-                    '<div>'
-                    '<span style="font-size: 13px; color: #94a3b8;">종목 및 타임프레임</span>'
-                    f'<h3 style="margin:0; color: #38bdf8 !important;">{ticker_info}</h3>'
-                    '</div>'
-                    '<div style="text-align: right;">'
-                    '<span style="background: rgba(16,185,129,0.2); color: #10b981; padding: 6px 14px; border-radius: 20px; font-weight: 700;">'
-                    f'{ict_setup}'
-                    '</span>'
-                    f'<div style="font-size: 13px; color: #cbd5e1; margin-top: 6px;">{killzone_status}</div>'
-                    '</div>'
-                    '</div>'
-                    '</div>'
-                )
-                st.markdown(header_html, unsafe_allow_html=True)
+                    c1, c2, c3, c4 = st.columns(4)
+                    entry_val = data.get('entry', '-')
+                    sl_val = data.get('stop_loss', '-')
+                    tp1_val = data.get('tp1', '-')
+                    tp2_val = data.get('tp2', '-')
+                    rr_val = data.get('risk_reward', '-')
 
-                c1, c2, c3, c4 = st.columns(4)
-                entry_val = data.get('entry', '-')
-                sl_val = data.get('stop_loss', '-')
-                tp1_val = data.get('tp1', '-')
-                tp2_val = data.get('tp2', '-')
-                rr_val = data.get('risk_reward', '-')
+                    st_c1 = f'<div class="metric-box-entry"><div class="metric-label">🟢 매수 진입가 (Entry)</div><div class="metric-val" style="color: #10b981;">{entry_val}</div></div>'
+                    st_c2 = f'<div class="metric-box-sl"><div class="metric-label">🔴 손절가 (Stop Loss)</div><div class="metric-val" style="color: #ef4444;">{sl_val}</div></div>'
+                    st_c3 = f'<div class="metric-box-tp"><div class="metric-label">🔵 1차 목표가 (TP1)</div><div class="metric-val" style="color: #3b82f6;">{tp1_val}</div></div>'
+                    st_c4 = f'<div class="metric-box-tp"><div class="metric-label">🟣 2차 목표가 / 손익비</div><div class="metric-val" style="color: #a855f7;">{tp2_val} <span style="font-size:14px; color:#cbd5e1;">({rr_val})</span></div></div>'
 
-                st_c1 = f'<div class="metric-box-entry"><div class="metric-label">🟢 매수 진입가 (Entry)</div><div class="metric-val" style="color: #10b981;">{entry_val}</div></div>'
-                st_c2 = f'<div class="metric-box-sl"><div class="metric-label">🔴 손절가 (Stop Loss)</div><div class="metric-val" style="color: #ef4444;">{sl_val}</div></div>'
-                st_c3 = f'<div class="metric-box-tp"><div class="metric-label">🔵 1차 목표가 (TP1)</div><div class="metric-val" style="color: #3b82f6;">{tp1_val}</div></div>'
-                st_c4 = f'<div class="metric-box-tp"><div class="metric-label">🟣 2차 목표가 / 손익비</div><div class="metric-val" style="color: #a855f7;">{tp2_val} <span style="font-size:14px; color:#cbd5e1;">({rr_val})</span></div></div>'
+                    with c1:
+                        st.markdown(st_c1, unsafe_allow_html=True)
+                    with c2:
+                        st.markdown(st_c2, unsafe_allow_html=True)
+                    with c3:
+                        st.markdown(st_c3, unsafe_allow_html=True)
+                    with c4:
+                        st.markdown(st_c4, unsafe_allow_html=True)
 
-                with c1:
-                    st.markdown(st_c1, unsafe_allow_html=True)
-                with c2:
-                    st.markdown(st_c2, unsafe_allow_html=True)
-                with c3:
-                    st.markdown(st_c3, unsafe_allow_html=True)
-                with c4:
-                    st.markdown(st_c4, unsafe_allow_html=True)
+                    st.markdown("<br>", unsafe_allow_html=True)
 
-                st.markdown("<br>", unsafe_allow_html=True)
+                    col_a, col_b = st.columns(2)
+                    with col_a:
+                        st.markdown("<div class='trade-card'><h4 style='color:#10b981 !important; margin-top:0;'>🧠 ICT 핵심 근거 (SMC Confluence)</h4>", unsafe_allow_html=True)
+                        for r in data.get('ict_reasons', []):
+                            st.markdown(f"• {r}")
+                        st.markdown("</div>", unsafe_allow_html=True)
 
-                col_a, col_b = st.columns(2)
-                with col_a:
-                    st.markdown("<div class='trade-card'><h4 style='color:#10b981 !important; margin-top:0;'>🧠 ICT 핵심 근거 (SMC Confluence)</h4>", unsafe_allow_html=True)
-                    for r in data.get('ict_reasons', []):
-                        st.markdown(f"• {r}")
-                    st.markdown("</div>", unsafe_allow_html=True)
+                    with col_b:
+                        invalidation_text = data.get('invalidation', '지정 손절가 이탈 시 즉시 손절')
+                        st.markdown(f"<div class='trade-card'><h4 style='color:#ef4444 !important; margin-top:0;'>🚨 손절 / 무효화 기준 (Invalidation)</h4><p>{invalidation_text}</p></div>", unsafe_allow_html=True)
 
-                with col_b:
-                    invalidation_text = data.get('invalidation', '지정 손절가 이탈 시 즉시 손절')
-                    st.markdown(f"<div class='trade-card'><h4 style='color:#ef4444 !important; margin-top:0;'>🚨 손절 / 무효화 기준 (Invalidation)</h4><p>{invalidation_text}</p></div>", unsafe_allow_html=True)
+                else:
+                    st.markdown(raw_text)
 
-            else:
-                st.markdown(raw_text)
+            except Exception as e:
+                st.error(f"분석 오류: {e}")
 
-        except Exception as e:
-            st.error(f"분석 오류: {e}")
-            if api_key:
-if "messages" not in st.session_state:
-st.session_state.messages = []
+# ---------------------------------------------------------
+# 8. 사이드바 대화창
+# ---------------------------------------------------------
+if api_key:
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
 
-for msg in st.session_state.messages:
-    with st.sidebar.chat_message(msg["role"]):
-        st.markdown(msg["content"])
+    for msg in st.session_state.messages:
+        with st.sidebar.chat_message(msg["role"]):
+            st.markdown(msg["content"])
 
-if user_input := st.sidebar.chat_input("ICT / 종목 질문..."):
-    st.session_state.messages.append({"role": "user", "content": user_input})
-    with st.sidebar.chat_message("user"):
-        st.markdown(user_input)
+    if user_input := st.sidebar.chat_input("ICT / 종목 질문..."):
+        st.session_state.messages.append({"role": "user", "content": user_input})
+        with st.sidebar.chat_message("user"):
+            st.markdown(user_input)
 
-    with st.sidebar.chat_message("assistant"):
-        try:
-            res_text, _ = call_gemini_ai(api_key, [f"{SYSTEM_PROMPT}\n\n질문: {user_input}"])
-            st.markdown(res_text)
-            st.session_state.messages.append({"role": "assistant", "content": res_text})
-        except Exception as e:
-            st.error(f"대화 오류: {e}")
+        with st.sidebar.chat_message("assistant"):
+            try:
+                res_text, _ = call_gemini_ai(api_key, [f"{SYSTEM_PROMPT}\n\n질문: {user_input}"])
+                st.markdown(res_text)
+                st.session_state.messages.append({"role": "assistant", "content": res_text})
+            except Exception as e:
+                st.error(f"대화 오류: {e}")
