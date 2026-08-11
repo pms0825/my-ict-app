@@ -100,7 +100,7 @@ if not st.session_state.authenticated:
     st.stop()
 
 # ---------------------------------------------------------
-# 3. [최상위 업그레이드] 4-Timeframe 초정밀 ICT 비전 시스템 프롬프트
+# 3. 4-Timeframe 초정밀 ICT 비전 시스템 프롬프트
 # ---------------------------------------------------------
 SYSTEM_PROMPT = """
 [Role & Identity]
@@ -153,28 +153,50 @@ SYSTEM_PROMPT = """
 """
 
 # ---------------------------------------------------------
-# 4. 통합 Gemini 호출 함수 (모델 404 에러 방지 지원)
+# 4. 동적 AI 모델 탐색 및 호출 함수 (404 완벽 방지)
 # ---------------------------------------------------------
 def call_gemini_ai(api_key, contents):
     genai.configure(api_key=api_key)
-    candidate_models = [
+    
+    # 최신 규격 모델 1차 탐색 리스트
+    primary_models = [
+        'gemini-2.5-flash',
+        'gemini-2.0-flash',
         'gemini-1.5-flash',
-        'gemini-1.5-pro',
-        'gemini-1.5-flash-latest',
-        'gemini-1.5-pro-latest'
+        'gemini-1.5-pro'
     ]
     
-    last_error = None
-    for model_name in candidate_models:
+    errors = []
+    
+    # 1. 최신 지정 모델 호출 시도
+    for model_name in primary_models:
         try:
             model = genai.GenerativeModel(model_name)
             response = model.generate_content(contents)
             return response.text, model_name
         except Exception as e:
-            last_error = e
+            errors.append(f"[{model_name}]: {e}")
             continue
-            
-    raise Exception(f"AI 모델 호출 실패: {last_error}")
+
+    # 2. 지정 모델 모두 실패 시, 계정에서 지원하는 모델 목록을 동적으로 가져와 2차 시도
+    try:
+        available_models = [
+            m.name for m in genai.list_models() 
+            if 'generateContent' in m.supported_generation_methods
+        ]
+        for model_name in available_models:
+            try:
+                model = genai.GenerativeModel(model_name)
+                response = model.generate_content(contents)
+                return response.text, model_name
+            except Exception as e:
+                errors.append(f"[{model_name}]: {e}")
+                continue
+    except Exception as list_err:
+        errors.append(f"[list_models]: {list_err}")
+
+    # 최종 실패 시 상세 원인 안내
+    raise Exception(f"사용 가능한 Gemini 모델을 찾을 수 없습니다. (API Key 확인 필요)\n상세 에러:\n" + "\n".join(errors[:2]))
 
 # ---------------------------------------------------------
 # 5. 사이드바 API 키 자동 감지 (Secrets 지원)
