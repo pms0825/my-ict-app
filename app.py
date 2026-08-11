@@ -3,7 +3,7 @@ import google.generativeai as genai
 from PIL import Image
 
 # ---------------------------------------------------------
-# 1. 트레이딩뷰 다크모드 스타일 커스텀 CSS (UI 1000배 업그레이드)
+# 1. 트레이딩뷰 다크모드 프로 터미널 커스텀 CSS (UI 업그레이드)
 # ---------------------------------------------------------
 st.set_page_config(
     page_title="ICT Pro Trading Terminal", 
@@ -32,16 +32,6 @@ st.markdown("""
     section[data-testid="stSidebar"] {
         background-color: #1e222d !important;
         border-right: 1px solid #2a2e39;
-    }
-    
-    /* 카드 컨테이너 디자인 */
-    .css-card {
-        background-color: #1e222d;
-        border: 1px solid #2a2e39;
-        border-radius: 12px;
-        padding: 20px;
-        margin-bottom: 20px;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
     }
     
     /* 버튼 커스텀 (트레이딩뷰 롱 녹색 Glow 효과) */
@@ -91,7 +81,7 @@ st.markdown("""
 # ---------------------------------------------------------
 # 2. 로그인 및 보안 시스템
 # ---------------------------------------------------------
-MY_PASSWORD = "1234"  # 원하는 비밀번호로 변경하세요
+MY_PASSWORD = "1234"  # 원하는 비밀번호로 변경 가능
 
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
@@ -110,23 +100,24 @@ if not st.session_state.authenticated:
     st.stop()
 
 # ---------------------------------------------------------
-# 3. 4-Timeframe 초정밀 ICT 비전 시스템 프롬프트
+# 3. [최상위 업그레이드] 4-Timeframe 초정밀 ICT 비전 시스템 프롬프트
 # ---------------------------------------------------------
 SYSTEM_PROMPT = """
 [Role & Identity]
-당신은 ICT(Inner Circle Trader) 및 SMC 이론에 입각한 '미국 급등주 Top-Down 멀티 타임프레임(1시간/15분/5분/1분봉) 비전 분석 엔진'입니다.
-오직 롱(Long/매수) 포지션만 분석하며, 상위 시간대의 세력 목표부터 하위 시간대의 스나이퍼 진입까지 교차 검증하여 타점을 추출합니다.
+당신은 ICT(Inner Circle Trader) 및 SMC(Smart Money Concepts) 이론에 입각한 '미국 급등주/단타 롱(Long/매수) 전용 멀티 타임프레임(1시간/15분/5분/1분봉) 비전 분석 엔진'입니다.
+사용자는 한국(KST) 거주 트레이더이며 오직 롱(Long) 포지션만 매매합니다. 숏(Short) 분석은 절대 배제하고, 상위 시간대의 세력 목표부터 하위 시간대의 스나이퍼 진입까지 시각적으로 교차 검증하여 승률 높은 타점만 산출하세요.
 
-[Multi-Timeframe Analysis Checklist]
-업로드된 각 시간대별 차트를 시각적으로 다음 기준에 따라 분석하세요:
-1. 1시간봉 (HTF): 큰 추세 방향성(Daily Bias) 및 주요 지지 FVG / 목표 BSL 구간
-2. 15분봉 (MTF): 저점 스윕(SSL Sweep) 발생 여부 및 15분봉 구조 관찰
-3. 5분봉 (MTF/LTF): 5분봉 상승 구조 전환(MSS) 및 강력한 5분봉 Bullish FVG 포착
-4. 1분봉 (LTF): 5분봉 FVG 내부에서 발생하는 1분봉 정밀 MSS + FVG 중첩(Confluence) 지점 계산
+[Image Vision Analysis Guidelines - 차트 시각 판독 수칙]
+업로드된 차트 이미지를 시각적으로 판독할 때 아래 5가지 요소를 명확히 찾으세요:
+1. 차트상의 봉 단위 타임프레임(1시간/15분/5분/1분봉) 식별.
+2. 주요 저점 밑으로 캔들 밑꼬리(Wick)가 내려갔다가 즉시 말아 올려 개미를 털었는지 여부 (SSL Sweep 포착).
+3. 스윕 직후 강한 양봉이 터지며 직전 고점을 종가로 돌파했는지 여부 (MSS: 상승 구조 전환).
+4. 상승 파동 도중 발생한 3개 캔들 간 비효율 빈 공간 (Bullish FVG: 1번 캔들 고점 ~ 3번 캔들 저점 사이) 범위 추출.
+5. 5분봉 FVG와 1분봉 FVG가 중첩(Confluence)되는 최적의 매수 구간 정밀 계산.
 
-[Timezone Rule]
-- 서머타임 (3~11월): NY Open Kill Zone (22:30 ~ 24:00 KST)
-- 서머타임 해제 (11~3월): NY Open Kill Zone (23:30 ~ 01:00 KST)
+[Timezone & Kill Zone Rules (KST Base)]
+- 서머타임 기간 (3월~11월): 🔥 NY Open Kill Zone (22:30 ~ 24:00 KST) / 🌙 PM Kill Zone (02:30 ~ 04:00 KST)
+- 서머타임 해제 기간 (11월~3월): 🔥 NY Open Kill Zone (23:30 ~ 01:00 KST) / 🌙 PM Kill Zone (03:30 ~ 05:00 KST)
 
 [Output Format]
 반드시 아래 양식으로만 답변하세요:
@@ -135,51 +126,66 @@ SYSTEM_PROMPT = """
 [⚡ ICT 4-Timeframe Long Trade Plan]
 
 1. 🧭 시장 맥락 및 킬존 (KST)
-   - 킬존 판정: [NY Open 킬존 / PM 킬존 / 킬존 외]
-   - HTF 1시간봉 맥락: [매수 Bias 여부 및 지지선 위치]
+   - 업로드 차트: [시각 판독된 타임프레임 및 종목명]
+   - 킬존 판정: [NY Open 킬존 / PM 킬존 / 킬존 외 (주의 경고)]
+   - HTF 1시간봉/15분봉 맥락: [매수 Bias 여부 및 지지선 위치]
 
-2. 🔍 시간대별 ICT 구조 교차 검증
-   - 1시간/15분봉: [개미 털기 저점 스윕(SSL) 가격대]
-   - 5분봉: [5분봉 MSS 발생 및 5분봉 FVG 범위]
-   - 1분봉: [1분봉 정밀 MSS 및 5분+1분 중첩 FVG 지점]
+2. 🔍 다중 시간대 ICT 구조 교차 검증 (Vision Analysis)
+   - SSL 저점 스윕 (15분/5분): [개미 털기 꼬리 저점 가격 및 형성 위치]
+   - MSS 상승 구조 전환 (5분/1분): [돌파된 직전 스윙 고점 가격]
+   - Confluence 매수 갭: [5분봉 FVG와 1분봉 FVG가 중첩되는 핵심 지지 가격대]
 
-3. 🎯 실전 롱 매매 타점 (Long Setup)
-   - 🟢 진입가 (Entry): [5분/1분 중첩 FVG 중단 또는 OTE 0.618~0.786 가격]
-   - 🔴 손절가 (Stop Loss): [SSL 스윕 꼬리 끝 지점 바로 밑 - $0.05 여유]
+3. 🎯 실전 롱 매매 타점 (Long Setup Execution)
+   - 🟢 진입가 (Entry): [중첩 FVG 중단 또는 OTE 0.618~0.786 디스카운트 가격]
+   - 🔴 손절가 (Stop Loss): [SSL 스윕 꼬리 끝 지점 바로 밑 - $0.05~$0.10 여유]
    - 🔵 1차 익절가 (TP1): [직전 스윙 고점 BSL]
    - 🟣 2차 익절가 (TP2): [1시간봉 상위 유동성 BSL 또는 손익비 1:3 지점]
-   - 📐 손익비 (Risk to Reward): [예: 1 : 2.9]
+   - 📐 손익비 (Risk to Reward): [예: 1 : 2.8]
 
-4. 🚨 진입 취소 조건 (Invalidation)
-   - [FVG 하단 이탈 시, 킬존 시간 종료 시 진입 취소]
+4. 🚨 진입 취소 및 무효화 조건 (Invalidation)
+   - [FVG 하단 종가 이탈 시, 킬존 시간 종료 시, 거래량 이탈 시 진입 취소]
 ---------------------------------------------------
+
+[Strict Trading Rules]
+- 숏(Short) 포지션 절대 추천 금지.
+- 저점 스윕(SSL Sweep) 흔적이 없는 무지성 급등 차트는 "진입 불가(No Trade)"로 처리.
+- 손익비(Risk to Reward)가 최소 1:2 미만인 자리는 진입 자제 권고.
 """
 
 # ---------------------------------------------------------
-# 4. 안전한 Gemini 모델 호출 함수 (404 에러 방지 복구 로직)
+# 4. 통합 Gemini 호출 함수 (모델 404 에러 방지 지원)
 # ---------------------------------------------------------
-def generate_ict_analysis(api_key, prompt, images):
+def call_gemini_ai(api_key, contents):
     genai.configure(api_key=api_key)
+    candidate_models = [
+        'gemini-1.5-flash',
+        'gemini-1.5-pro',
+        'gemini-1.5-flash-latest',
+        'gemini-1.5-pro-latest'
+    ]
     
-    # 404 에러 방지를 위한 최신 모델 우선순위 리스트
-    model_names = ['gemini-2.0-flash', 'gemini-1.5-flash-latest', 'gemini-1.5-pro']
-    
-    for model_name in model_names:
+    last_error = None
+    for model_name in candidate_models:
         try:
             model = genai.GenerativeModel(model_name)
-            contents = [prompt] + [img for img in images if img is not None]
             response = model.generate_content(contents)
             return response.text, model_name
         except Exception as e:
+            last_error = e
             continue
             
-    raise Exception("Gemini API 호출 실패: API Key를 확인하거나 최신 모델 접근 권한을 확인하세요.")
+    raise Exception(f"AI 모델 호출 실패: {last_error}")
 
 # ---------------------------------------------------------
-# 5. 사이드바 설정
+# 5. 사이드바 API 키 자동 감지 (Secrets 지원)
 # ---------------------------------------------------------
 st.sidebar.markdown("## ⚙️ TERMINAL SETTINGS")
-api_key = st.sidebar.text_input("Gemini API Key:", type="password", help="Google AI Studio에서 받은 API 키를 입력하세요.")
+
+if "GEMINI_API_KEY" in st.secrets:
+    api_key = st.secrets["GEMINI_API_KEY"]
+    st.sidebar.success("🔑 API Key 자동 연결됨")
+else:
+    api_key = st.sidebar.text_input("Gemini API Key:", type="password", help="Google AI Studio의 API 키를 입력하세요.")
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("## 💬 LIVE AI CONSULTING")
@@ -190,7 +196,6 @@ st.sidebar.markdown("## 💬 LIVE AI CONSULTING")
 st.markdown("<h1 style='color: #2962ff !important;'>⚡ ICT MULTI-TIMEFRAME TERMINAL</h1>", unsafe_allow_html=True)
 st.caption("1시간봉 / 15분봉 / 5분봉 / 1분봉 차트를 업로드하면 4중 분석으로 최고 승률의 롱 타점을 계산합니다.")
 
-# 4개 시간대 업로드 탭 생성
 tab1, tab2, tab3, tab4 = st.tabs(["📊 1시간봉 (HTF)", "📈 15분봉 (MTF)", "📉 5분봉 (MTF)", "🎯 1분봉 (LTF)"])
 
 img_1h, img_15m, img_5m, img_1m = None, None, None, None
@@ -213,25 +218,25 @@ with tab4:
 
 st.markdown("---")
 
-# 분석 실행 버튼
 uploaded_images = [img for img in [img_1h, img_15m, img_5m, img_1m] if img is not None]
 
 if st.button("🚀 ICT 4-TIMEFRAME 롱 타점 정밀 분석 실행", type="primary"):
     if not api_key:
-        st.error("👈 사이드바에 Gemini API Key를 먼저 입력해 주세요!")
+        st.error("👈 사이드바에 Gemini API Key를 입력하거나 Secrets에 등록해 주세요!")
     elif not uploaded_images:
-        st.warning("최소 1개 이상의 차트 이미지를 업로드해 주세요! (4개 모두 올리면 승률 최대화)")
+        st.warning("최소 1개 이상의 차트 이미지를 업로드해 주세요!")
     else:
         with st.spinner("AI 비전 엔진이 4개 타임프레임을 교차 분석 중..."):
             try:
-                result_text, used_model = generate_ict_analysis(api_key, SYSTEM_PROMPT, uploaded_images)
-                st.success(f"분석 완료! (사용 모델: {used_model})")
+                contents = [SYSTEM_PROMPT] + uploaded_images
+                result_text, used_model = call_gemini_ai(api_key, contents)
+                st.success(f"분석 완료! (연결된 모델: {used_model})")
                 st.markdown(result_text)
             except Exception as e:
                 st.error(f"분석 오류: {e}")
 
 # ---------------------------------------------------------
-# 7. 실시간 사이드바 대화
+# 7. 실시간 사이드바 대화 (404 완벽 방지)
 # ---------------------------------------------------------
 if api_key:
     if "messages" not in st.session_state:
@@ -248,10 +253,9 @@ if api_key:
 
         with st.sidebar.chat_message("assistant"):
             try:
-                genai.configure(api_key=api_key)
-                chat_model = genai.GenerativeModel('gemini-2.0-flash')
-                res = chat_model.generate_content(f"{SYSTEM_PROMPT}\n\n사용자 질문: {user_input}")
-                st.markdown(res.text)
-                st.session_state.messages.append({"role": "assistant", "content": res.text})
+                chat_prompt = f"{SYSTEM_PROMPT}\n\n사용자 질문: {user_input}"
+                res_text, _ = call_gemini_ai(api_key, [chat_prompt])
+                st.markdown(res_text)
+                st.session_state.messages.append({"role": "assistant", "content": res_text})
             except Exception as e:
                 st.error(f"대화 오류: {e}")
